@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package messenger;
+
+message KeyExchange {
+    bytes publick_key = 1;
+}
+
+message SecureEnvelope {
+    bytes nonce = 1;      // '1' — это номер поля, а не значение
+    bytes  ciphertext = 2; // '2' — это номер поля
+    string sender_id = 3; // '3' — это номер поля
+    string recipient_id = 4;
+}
+
+message WriteMessage {
+    oneof payload {
+        KeyExchange key_exchange = 1;
+        SecureEnvelope chat_message = 2;
+    }
+}
+
+
