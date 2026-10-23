@@ -42,7 +42,33 @@ std::vector<unsigned char> SslWebsocket::generateKaypair() {
 }
 
 void SslWebsocket::sendMessage(const QString& message, const QString& recip_id) {
+    if(message.isEmpty()) {
+        qWarning() << "Message is empty";
+        return;
+    }
+    unsigned char nonce[crypto_box_NONCEBYTES];
+    randombytes_buf(nonce, crypto_box_NONCEBYTES);
+    std::vector<unsigned char> encrypted(message.size() + crypto_box_MACBYTES);
+    crypto_box_easy_afternm(
+        encrypted.data(),
+        reinterpret_cast<const unsigned char*>(message.toUtf8().constData()),
+        message.size(),
+        nonce,
+        shared_key_.data());
 
+    messenger::SecureEnvelope envelope;
+    QByteArray q_nonce(reinterpret_cast<const char*>(nonce), crypto_box_NONCEBYTES);
+    QByteArray q_encrypted(reinterpret_cast<const char*>(encrypted.data()), static_cast<int>(encrypted.size()));
+    QString sender_id = settings_.value("user_id").toString();
+    envelope.setNonce(q_nonce);
+    envelope.setCiphertext(q_encrypted);
+    envelope.setRecipientId(recip_id);
+    envelope.setSenderId(std::move(sender_id));
+    messenger::WriteMessage wm;
+    wm.setChatMessage(std::move(envelope));
+    QByteArray binaryData = serializer_.serialize(&wm);
+
+    socket_->sendBinaryMessage(binaryData);
 }
 
 void SslWebsocket::onBinaryMessageReceived(const QByteArray &data) {
@@ -65,7 +91,22 @@ void SslWebsocket::onBinaryMessageReceived(const QByteArray &data) {
 }
 
 void SslWebsocket::handleChatMessage(const messenger::SecureEnvelope& msg) {
+    QByteArray ciphertext = msg.ciphertext();
+    std::string sender_id = msg.senderId().toStdString();
+    std::string recip_id = msg.recipientId().toStdString();
+    QByteArray nonce = msg.nonce();
 
+    unsigned char decrypted[ciphertext.size() - crypto_box_MACBYTES];
+    if(crypto_box_open_easy_afternm(decrypted,
+                                     reinterpret_cast<unsigned char*>(ciphertext.data()),
+                                     static_cast<int>(ciphertext.size()),
+                                     reinterpret_cast<unsigned char*>(nonce.data()),
+                                     shared_key_.data()) != 0) {
+        qWarning() << "Handle char message error";
+        return;
+    }
+    QByteArray q_decrypted(reinterpret_cast<const char*>(decrypted), ciphertext.size() - crypto_box_MACBYTES);
+    QString message(q_decrypted);
 }
 
 void SslWebsocket::handleServerPublickKey(const messenger::KeyExchange& pub_key) {
