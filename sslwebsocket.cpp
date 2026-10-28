@@ -47,6 +47,27 @@ void SslWebsocket::sendPublicKey() {
 }
 
 void SslWebsocket::sendMessage(const QString& message, const QString& recip_id) {
+    if(message.isEmpty()) {
+        qWarning() << "Message is empty";
+        return;
+    }
+    if(shared_key_.empty()) {
+        qWarning() << "Shared key is empty";
+        return;
+    }
+
+    QByteArray utf8 = message.toUtf8();
+
+    unsigned char nonce[crypto_box_NONCEBYTES];
+    randombytes_buf(nonce, crypto_box_NONCEBYTES);
+
+    std::vector<unsigned char> encrypted(utf8.size() + crypto_box_MACBYTES);
+    crypto_box_easy_afternm(
+        encrypted.data(),
+        reinterpret_cast<const unsigned char*>(utf8.constData()),
+        utf8.size(),
+        nonce,
+        shared_key_.data());
 
 }
 
@@ -72,7 +93,47 @@ void SslWebsocket::onBinaryMessageReceived(const QByteArray &data) {
 }
 
 void SslWebsocket::handleChatMessage(const messenger::SecureEnvelope& msg) {
+    if(shared_key_.empty()) {
+        qWarning() << "Shared key is empty";
+        m_errorMessage = "Shared key is empty";
+        emit errorMessageChanged();
+        return;
+    }
 
+    QByteArray ciphertext = msg.ciphertext();
+    QByteArray nonce = msg.nonce();
+
+    if (nonce.size() != crypto_box_NONCEBYTES) {
+        qWarning() << "bad nonce size:" << nonce.size();
+        m_errorMessage = "bad nonce size";
+        emit errorMessageChanged();
+        return;
+    }
+    if (ciphertext.size() < crypto_box_MACBYTES) {
+        qWarning() << "ciphertext too small";
+        m_errorMessage = "ciphertext too small";
+        emit errorMessageChanged();
+        return;
+    }
+
+    std::string sender_id = msg.senderId().toStdString();
+    std::string recip_id = msg.recipientId().toStdString();
+
+
+    unsigned char decrypted[ciphertext.size() - crypto_box_MACBYTES];
+    if(crypto_box_open_easy_afternm(decrypted,
+                                     reinterpret_cast<unsigned char*>(ciphertext.data()),
+                                     static_cast<int>(ciphertext.size()),
+                                     reinterpret_cast<unsigned char*>(nonce.data()),
+                                     shared_key_.data()) != 0) {
+        qWarning() << "Handle char message error";
+        m_errorMessage = "Jandle char message error";
+        emit errorMessageChanged();
+        return;
+    }
+    QByteArray q_decrypted(reinterpret_cast<const char*>(decrypted), ciphertext.size() - crypto_box_MACBYTES);
+    QString message(q_decrypted);
+    emit messageReeceived(std::stoi(sender_id), std::stoi(recip_id), message);
 }
 
 void SslWebsocket::handleServerPublickKey(const messenger::KeyExchange& pub_key) {
