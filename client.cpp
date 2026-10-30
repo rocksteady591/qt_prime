@@ -22,9 +22,8 @@ bool SslClient::containsToken() const {
 void SslClient::getChats() {
     QUrl url(QString("https://%1:%2/api/get_chats").arg(m_host).arg(m_port));
     QNetworkRequest req(url);
-    //req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-    QString token = settings_.value("token").toString();
-    req.setRawHeader("Authorization", "Bearer " + token.toUtf8());
+    req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    req.setRawHeader("Authorization", "Bearer " + settings_.value("token").toString().toUtf8());
     QJsonObject body;
     QByteArray json = QJsonDocument(body).toJson(QJsonDocument::Compact);
     QNetworkReply* reply = acc_->post(req, json);
@@ -46,28 +45,45 @@ void SslClient::getChats() {
             return;
         }
 
-        if (!doc.isObject()) {
-            m_errorMessage = "doc don't object";
+        if (doc.isNull() || doc.isEmpty()) {
+            emit chatsLoaded({});
+            return;
+        }
+
+        QJsonArray chatsArr;
+
+        if(doc.isArray()) {
+            chatsArr = doc.array();
+        }else if(doc.isObject()) {
+            QJsonObject data = doc.object();
+
+            QVariantList chats;
+
+            for(const auto& val : data) {
+                chatsArr.append(val);
+            }
+
+        }else {
+            m_errorMessage = "unexpected server response";
             emit errorMessageChanged();
             return;
         }
 
-        QJsonObject data = doc.object();
-
         QVariantList chats;
-
-        for(const auto& val : data) {
+        for (const QJsonValue &val : chatsArr) {
             QJsonObject obj = val.toObject();
             QVariantMap el;
-            el["id"] = obj.value("id").toInt();
-            el["user1_id"] = obj.value("user1_id").toInt();
-            el["user2_id"] = obj.value("user2_id").toInt();
-            el["recip_username"] = obj.value("recip_username").toString();
-            el["last_msg"] = obj.value("last_msg").toString();
+            el["id"]               = obj.value("id").toInt();
+            el["user1_id"]         = obj.value("user1_id").toInt();
+            el["user2_id"]         = obj.value("user2_id").toInt();
+            el["recip_username"]   = obj.value("recip_username").toString();
+            el["last_msg"]         = obj.value("last_msg").toString();
             el["create_timestamp"] = obj.value("create_timestamp").toString();
             chats.append(el);
         }
         emit chatsLoaded(chats);
+        m_errorMessage = "Username is empty";
+        emit errorMessageChanged();
     });
 }
 
@@ -119,6 +135,8 @@ void SslClient::findUser(const QString& username) {
             emit userNotFound();
             return;
         }
+        m_errorMessage = "";
+        emit errorMessageChanged();
         m_find_status = "";
         emit userNotFound();
         QJsonObject body = doc.object();
@@ -178,8 +196,10 @@ void SslClient::login(const QString& login, const QString& password) {
         settings_.sync();
         emit userDataChanged();
         emit loginSuccess();
+        m_errorMessage = "Username is empty";
+        emit errorMessageChanged();
+        getChats();
     });
-    getChats();
 }
 
 void SslClient::registerUser(const QString& login, const QString& password, const QString& passwordConfirm) {
@@ -236,6 +256,8 @@ void SslClient::registerUser(const QString& login, const QString& password, cons
         settings_.setValue("username", username);
         emit userDataChanged();
         emit registerSuccess();
+        m_errorMessage = "Username is empty";
+        emit errorMessageChanged();
     });
 }
 
@@ -254,6 +276,8 @@ void SslClient::logout() {
     settings_.sync();
     emit userDataChanged();
     emit loggedOut();
+    m_errorMessage = "Username is empty";
+    emit errorMessageChanged();
 }
 
 void SslClient::connectToServer() {

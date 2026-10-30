@@ -22,7 +22,18 @@ int main(int argc, char *argv[])
 
     SslClient client("10.0.2.2", 8081);
     SslWebsocket websocket("10.0.2.2", 9000);
-    websocket.connectWidthToken();
+    // WebSocket подключается после успешного логина
+    QObject::connect(&client, &SslClient::loginSuccess, [&]() {
+        websocket.connectWidthToken();
+    });
+    QObject::connect(&client, &SslClient::registerSuccess, [&]() {
+        websocket.connectWidthToken();
+    });
+
+    // Если токен уже есть при старте — подключаем сразу
+    if (client.containsToken()) {
+        websocket.connectWidthToken();
+    }
     engine.rootContext()->setContextProperty("WssClient", &websocket);
     engine.rootContext()->setContextProperty("SslClient", &client);
 

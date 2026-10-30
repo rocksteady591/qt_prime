@@ -74,6 +74,20 @@ Item {
                         Layout.fillWidth: true
                         elide: Text.ElideRight
                     }
+                    Text {
+                                id: errorText
+                                text: SslClient.errorMessage
+                                color: "red"
+                                font.pixelSize: 14
+                                // Исправление: вместо anchors используем Layout-свойства
+                                Layout.alignment: Qt.AlignHCenter
+                                horizontalAlignment: Text.AlignHCenter // Центрирование самого текста внутри компонента
+
+                                // Текст виден только тогда, когда он не пустой
+                                visible: text !== ""
+
+                                wrapMode: Text.WordWrap
+                            }
                 }
             }
             //message list
@@ -220,5 +234,11 @@ Item {
 
     Connections {
         target: WssClient
+        function onMessageReceived(senderId, recipId, text) {
+            const peerId = root.recipId
+            if (senderId !== peerId && recipId !== peerId) return
+            const isOwn = (String(senderId) === SslClient.userId)
+            root.addMessage(text, isOwn)
+        }
     }
 }

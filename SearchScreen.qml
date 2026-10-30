@@ -87,19 +87,18 @@ Item {
                         stackView.pop()
                     }
                 }
-            }
 
-            Text {
-                id: errorText
-                text: SslClient.errorMessageFound
-                color: "red"
-                font.pixelSize: 16
-                Layout.alignment: Qt.AlignHCenter
-                Layout.fillWidth: true
-                horizontalAlignment: Text.AlignHCenter
-                visible: text !== ""
-                wrapMode: Text.WordWrap
-                //onTextChanged: searchModel.clear()
+                Text {
+                    id: errorText
+                    text: SslClient.errorMessageFound
+                    color: "red"
+                    font.pixelSize: 16
+                    Layout.alignment: Qt.AlignHCenter
+                    horizontalAlignment: Text.AlignHCenter
+                    visible: text !== ""
+                    wrapMode: Text.WordWrap
+                    //onTextChanged: searchModel.clear()
+                }
             }
 
             // ------- РЕЗУЛЬТАТЫ ПОИСКА -------
@@ -167,11 +166,11 @@ Item {
                             text: "Написать"
                             onClicked: {
                                 console.log("открыть чат с user_id =", model.user_id)
-                                // stackView.push("ChatScreen.qml", {
-                                //     userId:    model.user_id,
-                                //     userName:  model.username,
-                                //     userLogin: model.user_login
-                                // })
+                                 stackView.push("ChatScreen.qml", {
+                                     userId:    model.user_id,
+                                     userName:  model.username,
+                                     userLogin: model.user_login
+                                 })
                             }
                         }
                     }

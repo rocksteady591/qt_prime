@@ -19,9 +19,10 @@ public:
     Q_INVOKABLE void disconnectFromServer();
     Q_INVOKABLE void sendMessage(const QString& message, const QString& recip_id);
     QString errorMessage() const { return m_errorMessage; }
-    std::vector<unsigned char> generateKaypair();
+    void generateKaypair();
     void handleServerPublickKey(const messenger::KeyExchange& pub_key);
     void handleChatMessage(const messenger::SecureEnvelope& msg);
+    void sendPublicKey();
 private slots:
     void onConnected();
     void onDisconnected();
@@ -32,6 +33,7 @@ signals:
     void errorMessageChanged();
     void connectedChanged();
     void discconnectedChanged();
+    void messageReeceived(int senderId, int recipId, const QString& message);
 private:
     QWebSocket* socket_;
     QString host_;
@@ -39,7 +41,8 @@ private:
     QString m_errorMessage;
     QSettings settings_;
     QProtobufSerializer serializer_;
-    std::vector<unsigned char> key_;
+    std::vector<unsigned char> secret_key_;
+    std::vector<unsigned char> public_key_;
     std::vector<unsigned char> shared_key_;
 };
 

@@ -26,7 +26,7 @@ public:
     Q_INVOKABLE QString username() const;
     Q_INVOKABLE QString userId() const;
     Q_INVOKABLE void logout();
-    void getChats();
+    Q_INVOKABLE void getChats();
 signals:
     void loginSuccess();
     void registerSuccess();

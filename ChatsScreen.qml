@@ -54,6 +54,22 @@ Item {
                             stackView.push("SearchScreen.qml")
                         }
                     }
+                    Text {
+                                id: errorText
+                                text: SslClient.errorMessage
+                                color: "red"
+                                font.pixelSize: 14
+
+                                // Исправление: вместо anchors используем Layout-свойства
+                                Layout.alignment: Qt.AlignHCenter
+                                Layout.fillWidth: true
+                                horizontalAlignment: Text.AlignHCenter // Центрирование самого текста внутри компонента
+
+                                // Текст виден только тогда, когда он не пустой
+                                visible: text !== ""
+
+                                wrapMode: Text.WordWrap
+                            }
                 }
             }
 
@@ -181,6 +197,7 @@ Item {
                     }
                 }
             }
+
             Connections {
                 target: SslClient
 

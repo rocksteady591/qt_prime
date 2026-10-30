@@ -15,8 +15,9 @@ ApplicationWindow {
     color: "#0F1626"
 
     function onAppStart() {
-        if (SslClient.containsToken) {
-            stackView.push("ChatsScreen.qml")
+        if (SslClient.containsToken()) {
+            SslClient.getChats()
+            stackView.replace("ChatsScreen.qml")
         }
     }
 
