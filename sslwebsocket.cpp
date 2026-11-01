@@ -47,17 +47,20 @@ void SslWebsocket::sendPublicKey() {
 }
 
 void SslWebsocket::sendMessage(const QString& message, const QString& recip_id) {
-    if(message.isEmpty()) {
-        qWarning() << "Message is empty";
-        return;
-    }
-    if(shared_key_.empty()) {
-        qWarning() << "Shared key is empty";
+    if (message.isEmpty()) { qWarning() << "Message is empty"; return; }
+    if (shared_key_.empty()) { qWarning() << "Shared key is empty"; return; }
+
+    bool ok = false;
+    int recip_int = recip_id.toInt(&ok);
+    if (!ok || recip_int <= 0) { qWarning() << "invalid recip_id:" << recip_id; return; }
+
+    QString sender_id = settings_.value("user_id").toString();
+    if (sender_id.isEmpty() || sender_id == "0") {
+        qWarning() << "user_id is not set";
         return;
     }
 
     QByteArray utf8 = message.toUtf8();
-
     unsigned char nonce[crypto_box_NONCEBYTES];
     randombytes_buf(nonce, crypto_box_NONCEBYTES);
 
@@ -69,6 +72,18 @@ void SslWebsocket::sendMessage(const QString& message, const QString& recip_id) 
         nonce,
         shared_key_.data());
 
+    messenger::SecureEnvelope envelope;
+    envelope.setNonce(QByteArray(reinterpret_cast<const char*>(nonce), crypto_box_NONCEBYTES));
+    envelope.setCiphertext(QByteArray(reinterpret_cast<const char*>(encrypted.data()),
+                                      static_cast<int>(encrypted.size())));
+    envelope.setSenderId(sender_id);
+    envelope.setRecipientId(recip_id);
+
+    messenger::WriteMessage wm;
+    wm.setChatMessage(envelope);
+    QByteArray binaryData = serializer_.serialize(&wm);
+    socket_->sendBinaryMessage(binaryData);
+    qDebug() << "sent" << binaryData.size() << "bytes to" << recip_id;
 }
 
 void SslWebsocket::onBinaryMessageReceived(const QByteArray &data) {

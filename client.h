@@ -27,6 +27,7 @@ public:
     Q_INVOKABLE QString userId() const;
     Q_INVOKABLE void logout();
     Q_INVOKABLE void getChats();
+    Q_INVOKABLE void getChatMessages(int chat_id, int count_messages = 50, int offset = 0);
 signals:
     void loginSuccess();
     void registerSuccess();
@@ -38,6 +39,7 @@ signals:
     void userNotFound();
     void chatsLoaded(const QVariantList& chats);
     void userFound(const QVariantMap& user);
+    void messagesLoaded(const QVariantList& messages);
 private slots:
     void socketStateChanged(QAbstractSocket::SocketState state);
     void socketEncrypted();

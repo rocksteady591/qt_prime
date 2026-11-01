@@ -82,8 +82,82 @@ void SslClient::getChats() {
             chats.append(el);
         }
         emit chatsLoaded(chats);
-        m_errorMessage = "Username is empty";
-        emit errorMessageChanged();
+    });
+}
+
+void SslClient::getChatMessages(int chat_id, int count_messages, int offset) {
+    if (chat_id <= 0) {
+        emit messagesLoaded({});   // новый чат — истории нет
+        return;
+    }
+    QUrl url(QString("https://%1:%2/api/get_messages").arg(m_host).arg(m_port));
+    QNetworkRequest req(url);
+    req.setRawHeader("Authorization", "Bearer " + settings_.value("token").toString().toUtf8());
+    req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+
+    QJsonObject body {
+        {"count_messages", count_messages},
+        {"offset", offset},
+        {"chat_id", chat_id}
+    };
+
+    QByteArray data = QJsonDocument(body).toJson(QJsonDocument::Compact);
+
+    QNetworkReply* reply = acc_->post(req, data);
+
+    connect(reply, &QNetworkReply::finished, this, [reply, this](){
+        reply->deleteLater();
+
+        if(reply->error() != QNetworkReply::NoError) {
+            m_errorMessage = reply->errorString();
+            emit errorMessageChanged();
+            emit messagesLoaded({});
+            return;
+        }
+
+        QByteArray data = reply->readAll();
+        QJsonParseError err;
+        QJsonDocument doc = QJsonDocument::fromJson(data, &err);
+
+        if (err.error != QJsonParseError::NoError) {
+            m_errorMessage = err.errorString();
+            emit errorMessageChanged();
+            emit messagesLoaded({});
+            return;
+        }
+
+        int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+
+        if (statusCode != 200) {
+            m_errorMessage = QString("GetMessages failed: HTTP %1").arg(statusCode);
+            emit errorMessageChanged();
+            emit messagesLoaded({});
+            return;
+        }
+
+        if (!doc.isArray()) {
+            m_errorMessage = "doc don't array";
+            emit errorMessageChanged();
+            emit messagesLoaded({});
+            return;
+        }
+
+        QJsonObject body = doc.object();
+
+        const QJsonArray arr = doc.array();
+        QVariantList res;
+        res.reserve(arr.size());
+        for (const QJsonValue& val : arr) {
+            const QJsonObject obj = val.toObject();
+            QVariantMap el;
+            el["msg_id"]    = obj.value("msg_id").toInt();
+            el["chat_id"]   = obj.value("chat_id").toInt();
+            el["sender_id"] = obj.value("sender_id").toInt();
+            el["text"]      = obj.value("text").toString();
+            el["send_time"] = obj.value("send_time").toString();
+            res.append(el);
+        }
+        emit messagesLoaded(res);
     });
 }
 
@@ -140,6 +214,9 @@ void SslClient::findUser(const QString& username) {
         m_find_status = "";
         emit userNotFound();
         QJsonObject body = doc.object();
+        qDebug() << body["user_id"].toInt();
+        qDebug() << body["username"].toString();
+        qDebug() << body["user_login"].toString();
         QVariantMap variant = body.toVariantMap();
         emit userFound(variant);
     });
@@ -196,8 +273,6 @@ void SslClient::login(const QString& login, const QString& password) {
         settings_.sync();
         emit userDataChanged();
         emit loginSuccess();
-        m_errorMessage = "Username is empty";
-        emit errorMessageChanged();
         getChats();
     });
 }
@@ -256,8 +331,6 @@ void SslClient::registerUser(const QString& login, const QString& password, cons
         settings_.setValue("username", username);
         emit userDataChanged();
         emit registerSuccess();
-        m_errorMessage = "Username is empty";
-        emit errorMessageChanged();
     });
 }
 
@@ -276,8 +349,6 @@ void SslClient::logout() {
     settings_.sync();
     emit userDataChanged();
     emit loggedOut();
-    m_errorMessage = "Username is empty";
-    emit errorMessageChanged();
 }
 
 void SslClient::connectToServer() {

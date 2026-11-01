@@ -167,9 +167,9 @@ Item {
                             onClicked: {
                                 console.log("открыть чат с user_id =", model.user_id)
                                  stackView.push("ChatScreen.qml", {
-                                     userId:    model.user_id,
                                      userName:  model.username,
-                                     userLogin: model.user_login
+                                     userLogin: model.user_login,
+                                     recipId:   model.user_id
                                  })
                             }
                         }

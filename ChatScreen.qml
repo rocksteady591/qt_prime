@@ -7,9 +7,10 @@ Item {
     width: parent.width
     height: parent.height
 
-    property int chatId: 0
     property string username: ""
+    property string userLogin: ""
     property int recipId: 0
+    property int chatId: 0
 
     ListModel {
         id: messageModel
@@ -214,6 +215,12 @@ Item {
             }
         }
     }
+    Component.onCompleted: {
+        if(root.chatId > 0) {
+            SslClient.getChatMessages(root.chatId)
+        }
+    }
+
     //логика
     function sendCurrentMessage() {
         let txt = messageInput.text
@@ -230,6 +237,29 @@ Item {
                                 "isOwn": isOwn,
                                 "time": now
                             })
+    }
+
+    Connections {
+        target: SslClient
+        function onMessagesLoaded(messages) {
+            messageModel.clear()
+            for (let i = messages.lenth - 1; i >= 0; --i) {
+                const m = messages[i]
+                messageModel.append({
+                    "text": m.text,
+                    "isOwn": (String(m.sender_id) === String(SslClient.userId)),
+                    "time": formatTime(m.send_time)
+                })
+            }
+            if (messages.length > 0)
+                Qt.callLater(() => messageList.positionViewAtEnd())
+        }
+    }
+
+    function formatTime(s) {
+        if (!s) return ""
+        const m = String(s).match(/(\d{2}:\d{2})/)
+        return m ? m[1] : String(s)
     }
 
     Connections {

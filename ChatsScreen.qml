@@ -99,7 +99,11 @@ Item {
 
                             Text {
                                 anchors.centerIn: parent
-                                text: model.chatName[0]
+                                text: {
+                                    const text = model.recip_username || ""
+                                    return name.length > 0 ? name[0].toUpperCase() : "?"
+                                }
+
                                 color: "white"
                                 font.bold: true
                                 font.pixelSize: 18
@@ -111,7 +115,7 @@ Item {
                             spacing: 4
 
                             Text {
-                                text: model.chatName
+                                text: model.recip_username
                                 color: "white"
                                 font.bold: true
                                 font.pixelSize: 16
@@ -119,7 +123,7 @@ Item {
                             }
 
                             Text {
-                                text: model.lastMessage
+                                text: model.last_msg || ""
                                 color: "#8FA0C0"
                                 font.pixelSize: 14
                                 Layout.fillWidth: true
@@ -128,7 +132,7 @@ Item {
                         }
 
                         Text {
-                            text: model.time
+                            text: model.model.create_timestamp || ""
                             color: "#8FA0C0"
                             font.pixelSize: 12
                         }
@@ -138,6 +142,12 @@ Item {
                         anchors.fill: parent
                         onClicked: {
                             console.log("Кликнули на чат с: " + model.chatName)
+                            stackView.push("ChatScreen.qml", {
+                                username : model.recip_username,
+                                recipId:   (model.user1_id === parseInt(SslClient.userId))
+                                                    ? model.user2_id
+                                                    : model.user1_id
+                            })
                         }
                     }
                 }
