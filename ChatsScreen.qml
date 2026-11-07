@@ -50,26 +50,26 @@ Item {
                             verticalAlignment: Text.AlignVCenter
                         }
                         onClicked: {
+                            errorText = ""
                             console.log("The search button pressed");
                             stackView.push("SearchScreen.qml")
                         }
                     }
                     Text {
-                                id: errorText
-                                text: SslClient.errorMessage
-                                color: "red"
-                                font.pixelSize: 14
+                        id: errorText
+                        text: SslClient.errorMessage
+                        color: "red"
+                        font.pixelSize: 14
 
-                                // Исправление: вместо anchors используем Layout-свойства
-                                Layout.alignment: Qt.AlignHCenter
-                                Layout.fillWidth: true
-                                horizontalAlignment: Text.AlignHCenter // Центрирование самого текста внутри компонента
+                        Layout.alignment: Qt.AlignHCenter
+                        Layout.fillWidth: true
+                        horizontalAlignment: Text.AlignHCenter // Центрирование самого текста внутри компонента
 
-                                // Текст виден только тогда, когда он не пустой
-                                visible: text !== ""
+                        // Текст виден только тогда, когда он не пустой
+                        visible: text !== ""
 
-                                wrapMode: Text.WordWrap
-                            }
+                        wrapMode: Text.WordWrap
+                    }
                 }
             }
 
@@ -148,6 +148,7 @@ Item {
                                                     ? model.user2_id
                                                     : model.user1_id
                             })
+                            errorText = ""
                         }
                     }
                 }
@@ -188,6 +189,7 @@ Item {
                         }
                         onClicked: {
                             console.log("Переход в контакты")
+                            errorText = ""
                         }
                     }
 
@@ -203,6 +205,7 @@ Item {
                         }
                         onClicked: {
                             stackView.push("SettingsScreen.qml")
+                            errorText = ""
                         }
                     }
                 }

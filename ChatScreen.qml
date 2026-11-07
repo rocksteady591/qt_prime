@@ -76,19 +76,18 @@ Item {
                         elide: Text.ElideRight
                     }
                     Text {
-                                id: errorText
-                                text: SslClient.errorMessage
-                                color: "red"
-                                font.pixelSize: 14
-                                // Исправление: вместо anchors используем Layout-свойства
-                                Layout.alignment: Qt.AlignHCenter
-                                horizontalAlignment: Text.AlignHCenter // Центрирование самого текста внутри компонента
+                        id: errorText
+                        text: SslClient.errorMessage
+                        color: "red"
+                        font.pixelSize: 14
+                        Layout.alignment: Qt.AlignHCenter
+                        horizontalAlignment: Text.AlignHCenter // Центрирование самого текста внутри компонента
 
-                                // Текст виден только тогда, когда он не пустой
-                                visible: text !== ""
+                        // Текст виден только тогда, когда он не пустой
+                        visible: text !== ""
 
-                                wrapMode: Text.WordWrap
-                            }
+                        wrapMode: Text.WordWrap
+                    }
                 }
             }
             //message list

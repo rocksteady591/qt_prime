@@ -5,7 +5,7 @@ project(qt_prime VERSION 0.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Quick Protobuf Widgets Network WebSockets)
+find_package(Qt6 REQUIRED COMPONENTS Quick Protobuf Widgets Network WebSockets Sql)
 find_package(libsodium REQUIRED)
 
 qt_standard_project_setup(REQUIRES 6.10)
@@ -54,6 +54,7 @@ target_link_libraries(appqt_prime
     Qt6::Protobuf
     Qt6::Network
     Qt6::WebSockets
+    Qt6::Sql
     libsodium::libsodium
     my_messages_lib
 )

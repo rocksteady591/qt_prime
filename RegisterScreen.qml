@@ -10,6 +10,7 @@ Item {
         target: SslClient
         function onRegisterSuccess(){
             stackView.pop()
+            errorText = ""
         }
     }
 
@@ -81,6 +82,7 @@ Item {
                 verticalAlignment: Text.AlignVCenter
             }
             onClicked: {
+                errorText = ""
                 SslClient.registerUser(regLoginField.text, regPasswordField.text, regPasswordConfirmField.text);
             }
             Text {
