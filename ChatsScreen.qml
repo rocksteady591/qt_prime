@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
+import Chats 1.0
 
 Item {
     width: parent.width
@@ -14,8 +15,9 @@ Item {
             anchors.fill: parent
             spacing: 0
 
-            ListModel {
+            ChatsListModel {
                 id: chatModel
+                Component.onCompleted: refresh()
             }
 
             //Shader Effect
@@ -50,7 +52,6 @@ Item {
                             verticalAlignment: Text.AlignVCenter
                         }
                         onClicked: {
-                            errorText = ""
                             console.log("The search button pressed");
                             stackView.push("SearchScreen.qml")
                         }
@@ -100,7 +101,7 @@ Item {
                             Text {
                                 anchors.centerIn: parent
                                 text: {
-                                    const text = model.recip_username || ""
+                                    const text = model.recipUsername || ""
                                     return name.length > 0 ? name[0].toUpperCase() : "?"
                                 }
 
@@ -115,7 +116,7 @@ Item {
                             spacing: 4
 
                             Text {
-                                text: model.recip_username
+                                text: model.recipUsername
                                 color: "white"
                                 font.bold: true
                                 font.pixelSize: 16
@@ -123,7 +124,7 @@ Item {
                             }
 
                             Text {
-                                text: model.last_msg || ""
+                                text: model.lastMsg || ""
                                 color: "#8FA0C0"
                                 font.pixelSize: 14
                                 Layout.fillWidth: true
@@ -143,10 +144,11 @@ Item {
                         onClicked: {
                             console.log("Кликнули на чат с: " + model.chatName)
                             stackView.push("ChatScreen.qml", {
-                                username : model.recip_username,
-                                recipId:   (model.user1_id === parseInt(SslClient.userId))
-                                                    ? model.user2_id
-                                                    : model.user1_id
+                                chatId: model.chatId,
+                                username : model.recipUsername,
+                                recipId:   (model.user1Id === parseInt(SslClient.userId))
+                                                    ? model.user2Id
+                                                    : model.user1Id
                             })
                             errorText = ""
                         }
@@ -189,7 +191,6 @@ Item {
                         }
                         onClicked: {
                             console.log("Переход в контакты")
-                            errorText = ""
                         }
                     }
 
@@ -205,7 +206,6 @@ Item {
                         }
                         onClicked: {
                             stackView.push("SettingsScreen.qml")
-                            errorText = ""
                         }
                     }
                 }
@@ -216,7 +216,6 @@ Item {
 
                 function onChatsLoaded(chats) {
                     console.log("пришло чатов:", chats.length)
-                    chatModel.clear()
                     for (let i = 0; i < chats.length; i++) {
                         console.log("чат:", JSON.stringify(chats[i]))
                         chatModel.append(chats[i])

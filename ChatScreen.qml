@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
+import Chat 1.0
 
 Item {
     id: root
@@ -12,8 +13,17 @@ Item {
     property int recipId: 0
     property int chatId: 0
 
-    ListModel {
+    MessageModel {
         id: messageModel
+        chatId: root.chatId
+        currentUserId: SslClient.userId
+    }
+
+    Component.onCompleted: {
+        console.log("Открыт чат с ID:", root.chatId, "с пользователем:", root.username)
+        if (root.chatId > 0) {
+            SslClient.getChatMessages(root.chatId)
+        }
     }
 
     Rectangle {
@@ -109,7 +119,7 @@ Item {
                 delegate: Item {
                     width: messageList.width
                     // высота = высоте bubble + отступы
-                    height: bubble.height + 8
+                    height: bubble.height + 20
 
                     Rectangle {
                         id: bubble
@@ -212,11 +222,22 @@ Item {
                     }
                 }
             }
-        }
-    }
-    Component.onCompleted: {
-        if(root.chatId > 0) {
-            SslClient.getChatMessages(root.chatId)
+            Connections {
+                target: WssClient
+                function onMessageSaved(chat_id) {
+                    if (chat_id === root.chatId) {
+                        messageModel.refresh()
+                    }
+                }
+            }
+
+            Connections {
+                target: SslClient
+                function onMessagesLoaded(messages) {
+                    console.log("История сообщений загружена с сервера, обновляем модель")
+                    messageModel.refresh()
+                }
+            }
         }
     }
 
@@ -224,50 +245,9 @@ Item {
     function sendCurrentMessage() {
         let txt = messageInput.text
         if(txt.length === 0) return
-        addMessage(txt, true)
+        SslClient.sendMessageAndSaveToDb(txt, root.recipId, root.chatId, messageModel.currentUserId);
         WssClient.sendMessage(txt, root.recipId)
         messageInput.clear()
-    }
-
-    function addMessage(text, isOwn) {
-        let now = Qt.formatDateTime(new Date(), "HH:mm")
-        messageModel.append({
-                                "text": text,
-                                "isOwn": isOwn,
-                                "time": now
-                            })
-    }
-
-    Connections {
-        target: SslClient
-        function onMessagesLoaded(messages) {
-            messageModel.clear()
-            for (let i = messages.lenth - 1; i >= 0; --i) {
-                const m = messages[i]
-                messageModel.append({
-                    "text": m.text,
-                    "isOwn": (String(m.sender_id) === String(SslClient.userId)),
-                    "time": formatTime(m.send_time)
-                })
-            }
-            if (messages.length > 0)
-                Qt.callLater(() => messageList.positionViewAtEnd())
-        }
-    }
-
-    function formatTime(s) {
-        if (!s) return ""
-        const m = String(s).match(/(\d{2}:\d{2})/)
-        return m ? m[1] : String(s)
-    }
-
-    Connections {
-        target: WssClient
-        function onMessageReceived(senderId, recipId, text) {
-            const peerId = root.recipId
-            if (senderId !== peerId && recipId !== peerId) return
-            const isOwn = (String(senderId) === SslClient.userId)
-            root.addMessage(text, isOwn)
-        }
+        messageModel.refresh()
     }
 }

@@ -1,6 +1,7 @@
 #include "client.h"
 #include "sodium.h"
 #include <QCryptographicHash>
+#include <QSqlQuery>
 #include "message.qpb.h"
 
 SslClient::SslClient(const QString& host, quint16 port, QObject *parent) : QObject(parent), m_host(host), m_port(port) {
@@ -17,6 +18,24 @@ SslClient::SslClient(const QString& host, quint16 port, QObject *parent) : QObje
 
 bool SslClient::containsToken() const {
     return settings_.contains("token");
+}
+
+void SslClient::sendMessageAndSaveToDb(const QString &text, int recipId, int chatId, int sender_id) {
+    qint64 ts = QDateTime::currentSecsSinceEpoch();
+
+    QSqlQuery query;
+    query.prepare("INSERT INTO messages (chat_id, sender_id, text, timestamp, status) "
+                  "VALUES (:chat_id, :sender_id, :text, :ts, 0)");
+
+    query.bindValue(":chat_id", chatId);
+    query.bindValue(":sender_id", sender_id);
+    query.bindValue(":text", text);
+    query.bindValue(":ts", ts);
+
+    if (!query.exec()) {
+        qWarning() << "Ошибка вставки в бд";
+    }
+
 }
 
 void SslClient::getChats() {
@@ -69,6 +88,13 @@ void SslClient::getChats() {
             return;
         }
 
+        QSqlDatabase db = QSqlDatabase::database();
+        db.transaction();
+
+        QSqlQuery query;
+        query.prepare("INSERT OR REPLACE INTO chats (id, user1_id, user2_id, text, timestamp, recip_username) "
+                      "VALUES (:id, :user1_id, :user2_id, :text, :timestamp, :recip_username)");
+
         QVariantList chats;
         for (const QJsonValue &val : chatsArr) {
             QJsonObject obj = val.toObject();
@@ -80,14 +106,28 @@ void SslClient::getChats() {
             el["last_msg"]         = obj.value("last_msg").toString();
             el["create_timestamp"] = obj.value("create_timestamp").toString();
             chats.append(el);
+
+            query.bindValue(":id", obj.value("id").toInt());
+            query.bindValue(":user1_id", obj.value("user1_id").toInt());
+            query.bindValue(":user2_id", obj.value("user2_id").toInt());
+            query.bindValue(":text", obj.value("last_msg").toString());
+            query.bindValue(":timestamp", obj.value("create_timestamp").toString());
+            query.bindValue(":recip_username", obj.value("recip_username").toString());
+
+            if (!query.exec()) {
+                qWarning() << "Ошибка вставки в цикле: чаты";
+                db.rollback();
+                return;
+            }
         }
+        db.commit();
         emit chatsLoaded(chats);
     });
 }
 
 void SslClient::getChatMessages(int chat_id, int count_messages, int offset) {
     if (chat_id <= 0) {
-        emit messagesLoaded({});   // новый чат — истории нет
+        emit messagesLoaded({});
         return;
     }
     QUrl url(QString("https://%1:%2/api/get_messages").arg(m_host).arg(m_port));
@@ -102,10 +142,10 @@ void SslClient::getChatMessages(int chat_id, int count_messages, int offset) {
     };
 
     QByteArray data = QJsonDocument(body).toJson(QJsonDocument::Compact);
-
     QNetworkReply* reply = acc_->post(req, data);
 
-    connect(reply, &QNetworkReply::finished, this, [reply, this](){
+    // 👈 ВАЖНО: Захватываем chat_id в лямбду, чтобы использовать его при сохранении!
+    connect(reply, &QNetworkReply::finished, this, [reply, this, chat_id](){
         reply->deleteLater();
 
         if(reply->error() != QNetworkReply::NoError) {
@@ -127,7 +167,6 @@ void SslClient::getChatMessages(int chat_id, int count_messages, int offset) {
         }
 
         int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-
         if (statusCode != 200) {
             m_errorMessage = QString("GetMessages failed: HTTP %1").arg(statusCode);
             emit errorMessageChanged();
@@ -136,27 +175,45 @@ void SslClient::getChatMessages(int chat_id, int count_messages, int offset) {
         }
 
         if (!doc.isArray()) {
-            m_errorMessage = "doc don't array";
+            m_errorMessage = "Server response is not a JSON Array!";
             emit errorMessageChanged();
             emit messagesLoaded({});
             return;
         }
 
-        QJsonObject body = doc.object();
+        QSqlDatabase db = QSqlDatabase::database();
+        db.transaction();
+
+        QSqlQuery query;
+        query.prepare("INSERT OR IGNORE INTO messages (server_id, chat_id, sender_id, text, timestamp, status) "
+                      "VALUES (:server_id, :chat_id, :sender_id, :text, :timestamp, :status)");
 
         const QJsonArray arr = doc.array();
         QVariantList res;
         res.reserve(arr.size());
+
         for (const QJsonValue& val : arr) {
             const QJsonObject obj = val.toObject();
             QVariantMap el;
             el["msg_id"]    = obj.value("msg_id").toInt();
-            el["chat_id"]   = obj.value("chat_id").toInt();
-            el["sender_id"] = obj.value("sender_id").toInt();
+            el["chat_id"]   = chat_id; // 👈 Используем ID, который запросили
+            el["sender_id"] = obj.value("sender_id").toString(); // 👈 Читаем как строку
             el["text"]      = obj.value("text").toString();
             el["send_time"] = obj.value("send_time").toString();
             res.append(el);
+
+            query.bindValue(":server_id", obj.value("msg_id").toInt());
+            query.bindValue(":chat_id", chat_id); // 👈 Берем chat_id из аргумента функции, а не из JSON!
+            query.bindValue(":sender_id", obj.value("sender_id").toString()); // 👈 to String!
+            query.bindValue(":text", obj.value("text").toString());
+            query.bindValue(":timestamp", obj.value("send_time").toInt());
+            query.bindValue(":status", 0);
+
+            if (!query.exec()) {
+                qWarning() << "Ошибка вставки сообщения:";
+            }
         }
+        db.commit();
         emit messagesLoaded(res);
     });
 }

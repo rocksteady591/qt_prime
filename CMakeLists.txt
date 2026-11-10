@@ -36,6 +36,8 @@ qt_add_qml_module(appqt_prime
         QML_FILES RegisterScreen.qml
         QML_FILES SearchScreen.qml
         QML_FILES SettingsScreen.qml
+        SOURCES MessageModel.h
+        SOURCES ChatsListModel.h
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.

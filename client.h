@@ -28,6 +28,7 @@ public:
     Q_INVOKABLE void logout();
     Q_INVOKABLE void getChats();
     Q_INVOKABLE void getChatMessages(int chat_id, int count_messages = 50, int offset = 0);
+    Q_INVOKABLE void sendMessageAndSaveToDb(const QString &text, int recipId, int chatId, int sender_id);
 signals:
     void loginSuccess();
     void registerSuccess();

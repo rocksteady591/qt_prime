@@ -1,4 +1,5 @@
 #include "sslwebsocket.h"
+#include <QSqlQuery>
 #include <sodium.h>
 #include <sodium/crypto_box.h>
 
@@ -133,6 +134,12 @@ void SslWebsocket::handleChatMessage(const messenger::SecureEnvelope& msg) {
 
     std::string sender_id = msg.senderId().toStdString();
     std::string recip_id = msg.recipientId().toStdString();
+    int chat_id = msg.chatId();
+
+    if (sender_id == recip_id) {
+        qDebug() << "Игнорируем эхо собственного сообщения от сервера";
+        return; // Выходим, не сохраняя в БД
+    }
 
 
     unsigned char decrypted[ciphertext.size() - crypto_box_MACBYTES];
@@ -148,7 +155,22 @@ void SslWebsocket::handleChatMessage(const messenger::SecureEnvelope& msg) {
     }
     QByteArray q_decrypted(reinterpret_cast<const char*>(decrypted), ciphertext.size() - crypto_box_MACBYTES);
     QString message(q_decrypted);
-    emit messageReeceived(std::stoi(sender_id), std::stoi(recip_id), message);
+
+    qint64 ts = QDateTime::currentSecsSinceEpoch();
+
+    QSqlQuery query;
+    query.prepare("INSERT OR IGNORE INTO messages (chat_id, sender_id, text, timestamp, status) "
+                  "VALUES (:chat_id, :sender_id, :text, :ts, 0)");
+    query.bindValue(":chat_id", chat_id);
+    query.bindValue(":sender_id", QString::fromStdString(sender_id));
+    query.bindValue(":text", message);
+    query.bindValue(":ts", ts);
+
+    if (!query.exec()) {
+        qWarning() << "Ошибка вставки в бд при получении с сервера";
+    }
+
+    emit messageSaved(chat_id);
 }
 
 void SslWebsocket::handleServerPublickKey(const messenger::KeyExchange& pub_key) {

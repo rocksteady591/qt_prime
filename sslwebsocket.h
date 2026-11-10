@@ -33,7 +33,7 @@ signals:
     void errorMessageChanged();
     void connectedChanged();
     void discconnectedChanged();
-    void messageReeceived(int senderId, int recipId, const QString& message);
+    void messageSaved(int chat_id);
 private:
     QWebSocket* socket_;
     QString host_;

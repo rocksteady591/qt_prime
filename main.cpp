@@ -11,6 +11,8 @@
 #include "client.h"
 #include "sslwebsocket.h"
 #include <sodium.h>
+#include "MessageModel.h"
+#include "ChatsListModel.h"
 
 const int EXPECTED_SCHEMA_VERSION = 2;
 
@@ -54,7 +56,7 @@ bool runMigrations(QSqlDatabase& db) {
         ok = query.exec(
             "CREATE TABLE IF NOT EXISTS messages ("
             "    id INTEGER PRIMARY KEY AUTOINCREMENT,"
-            "    server_id INTEGER,"
+            "    server_id INTEGER UNIQUE,"
             "    chat_id INTEGER NOT NULL,"
             "    sender_id TEXT NOT NULL,"
             "    text TEXT NOT NULL,"
@@ -100,10 +102,11 @@ bool createTables() {
 
     bool ok = query.exec("CREATE TABLE IF NOT EXISTS chats ("
                          "id INTEGER PRIMARY KEY,"
-                         "user1_id INTEGER NOT NULL UNIQUE,"
-                         "user2_id INTEGER NOT NULL UNIQUE,"
+                         "user1_id INTEGER NOT NULL,"
+                         "user2_id INTEGER NOT NULL,"
                          "text TEXT NOT NULL,"
-                         "timestamp TEXT NOT NULL)");
+                         "timestamp TEXT NOT NULL,"
+                         "recip_username TEXT)");
 
     if (!ok) {
         qWarning() << "Ошибка создания таблицы chats:" << query.lastError().text();
@@ -183,9 +186,13 @@ int main(int argc, char *argv[])
     // Если токен уже есть при старте — подключаем сразу
     if (client.containsToken()) {
         websocket.connectWidthToken();
+        client.getChats();
     }
     engine.rootContext()->setContextProperty("WssClient", &websocket);
     engine.rootContext()->setContextProperty("SslClient", &client);
+
+    qmlRegisterType<MessageModel>("Chat", 1, 0, "MessageModel");
+    qmlRegisterType<ChatsListModel>("Chats", 1, 0, "ChatsListModel");
 
     QObject::connect(
         &engine,

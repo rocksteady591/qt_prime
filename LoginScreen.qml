@@ -114,7 +114,6 @@ Item {
                     onClicked: {
                         // Команда менеджеру экранов (StackView) открыть страницу регистрации поверх текущей
                         stackView.push("RegisterScreen.qml")
-                        errorText = ""
                     }
                 }
             }

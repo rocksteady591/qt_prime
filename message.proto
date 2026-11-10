@@ -11,6 +11,7 @@ message SecureEnvelope {
     bytes  ciphertext = 2; // '2' — это номер поля
     string sender_id = 3; // '3' — это номер поля
     string recipient_id = 4;
+    int32 chat_id = 5;
 }
 
 message WriteMessage {
