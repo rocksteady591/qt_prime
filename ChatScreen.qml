@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
+import QtQuick.Dialogs
 import Chat 1.0
 
 Item {
@@ -12,6 +13,7 @@ Item {
     property string userLogin: ""
     property int recipId: 0
     property int chatId: 0
+    property url image_path: ""
 
     MessageModel {
         id: messageModel
@@ -137,7 +139,7 @@ Item {
                         anchors.topMargin: 4
 
                         // цвет: свои — синие, чужие — тёмные
-                        color: model.isOwn ? "#2A82FF" : "#1C2333"
+                        color: model.isOwn ? "#2A82FF" : "#334155" // [FIX 7] чужой пузырь был #1C2333 и сливался с фоном #0F172A
 
                         Text {
                             id: messageText
@@ -162,6 +164,46 @@ Item {
                     }
                 }
             }
+
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: root.image_path.toString() !== "" ? 80 : 0
+                visible: root.image_path.toString() !== ""
+                color: "#1C2333"
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.margins: 10
+                    spacing: 10
+
+                    Image {
+                        source: root.image_path
+                        Layout.preferredHeight: 60
+                        Layout.preferredWidth: 60
+                        fillMode: Image.PreserveAspectCrop
+                        asynchronous: true
+                    }
+
+                    Button {
+                        Layout.preferredWidth: 30
+                        Layout.preferredHeight: 30
+                        background: Rectangle {
+                            radius: 15
+                            color: "#FF6B6B"
+                        }
+                        contentItem: Text {
+                            text: "✖"
+                            color: "white"
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                            font.pixelSize: 14
+                        }
+                        onClicked: root.image_path = ""
+                        Item { Layout.fillWidth: true }
+                    }
+                }
+            }
+
             //панель ввода
             Rectangle {
                 Layout.fillWidth: true
@@ -175,6 +217,37 @@ Item {
                     anchors.topMargin: 8
                     anchors.bottomMargin: 8
                     spacing: 10
+
+                    Button {
+                        Layout.preferredWidth: 44
+                        Layout.preferredHeight: 44
+
+                        background: Rectangle {
+                            radius: 22
+                            color: "#2A3447"
+                        }
+
+                        contentItem: Text {
+                            text: "📎"
+                            color: "white"
+                            font.pixelSize: 18
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+
+                        onClicked: imageDialog.open()
+                    }
+
+                    FileDialog {
+                        id: imageDialog
+                        title: "Выберите изображение"
+                        nameFilters: ["Изображения (*.png *.jpg *.jpeg)"]
+                        currentFolder: shortcuts.pictures
+                        onAccepted: {
+                            console.log("Выбран файл:", imageDialog.selectedFile)
+                            root.image_path = imageDialog.selectedFile
+                        }
+                    }
 
                     TextField {
                         id: messageInput
@@ -244,9 +317,16 @@ Item {
     //логика
     function sendCurrentMessage() {
         let txt = messageInput.text
+        let img = root.image_path
         if(txt.length === 0) return
         SslClient.sendMessageAndSaveToDb(txt, root.recipId, root.chatId, messageModel.currentUserId);
         WssClient.sendMessage(txt, root.recipId)
+        //надо добавить сохранение в бд и очищение свойства пути изображения
+        if (img.toString() !== "") {
+            root.image_path = ""
+            WssClient.sendImage(img, root.recipId)
+        }
+
         messageInput.clear()
         messageModel.refresh()
     }

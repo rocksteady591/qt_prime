@@ -2,6 +2,8 @@
 #include "sodium.h"
 #include <QCryptographicHash>
 #include <QSqlQuery>
+#include <QSqlError>   // [FIX 1] для lastError()
+#include <QTimeZone>   // [FIX 1] для разбора времени сервера
 #include "message.qpb.h"
 
 SslClient::SslClient(const QString& host, quint16 port, QObject *parent) : QObject(parent), m_host(host), m_port(port) {
@@ -192,25 +194,58 @@ void SslClient::getChatMessages(int chat_id, int count_messages, int offset) {
         QVariantList res;
         res.reserve(arr.size());
 
+        // [FIX 1] Разбор JSON не через toInt()/toString(): они возвращают 0 / "",
+        // если тип поля в JSON другой (число вместо строки и наоборот).
+        // toVariant() конвертирует и то и другое.
+        auto parseTime = [](const QJsonValue &v) -> qint64 {
+            if (v.isString()) {
+                const QString s = v.toString();
+                bool isNum = false;
+                const qint64 n = s.toLongLong(&isNum);
+                if (isNum) return n;                                   // "1731320000"
+                QDateTime dt = QDateTime::fromString(s, Qt::ISODate);  // "2026-11-11T10:00:00Z"
+                if (!dt.isValid()) {
+                    dt = QDateTime::fromString(s, "yyyy-MM-dd HH:mm:ss"); // подстрой под формат сервера
+                    if (dt.isValid())
+                        dt = QDateTime(dt.date(), dt.time(), QTimeZone::UTC);
+                }
+                return dt.isValid() ? dt.toSecsSinceEpoch() : 0;
+            }
+            return v.toVariant().toLongLong();
+        };
+
         for (const QJsonValue& val : arr) {
             const QJsonObject obj = val.toObject();
+            qDebug() << "get_messages item:" << obj; // [FIX 1] смотри, какие поля реально приходят
+
+            const qint64 serverId  = obj.value("msg_id").toVariant().toLongLong();  // [FIX 1]
+            const QString senderId = obj.value("sender_id").toVariant().toString(); // [FIX 1]
+            const qint64 ts        = parseTime(obj.value("send_time"));             // [FIX 1]
+            QString text = obj.value("text").toString();
+            if (text.isEmpty()) {                                                   // [FIX 1] запасные имена поля
+                text = obj.value("message").toString();
+                if (text.isEmpty()) text = obj.value("content").toString();
+            }
+            if (text.isEmpty())
+                qWarning() << "get_messages: пустой text, поля объекта:" << obj.keys(); // [FIX 1]
+
             QVariantMap el;
-            el["msg_id"]    = obj.value("msg_id").toInt();
-            el["chat_id"]   = chat_id; // 👈 Используем ID, который запросили
-            el["sender_id"] = obj.value("sender_id").toString(); // 👈 Читаем как строку
-            el["text"]      = obj.value("text").toString();
-            el["send_time"] = obj.value("send_time").toString();
+            el["msg_id"]    = serverId;
+            el["chat_id"]   = chat_id;
+            el["sender_id"] = senderId;
+            el["text"]      = text;
+            el["send_time"] = obj.value("send_time").toVariant().toString();
             res.append(el);
 
-            query.bindValue(":server_id", obj.value("msg_id").toInt());
-            query.bindValue(":chat_id", chat_id); // 👈 Берем chat_id из аргумента функции, а не из JSON!
-            query.bindValue(":sender_id", obj.value("sender_id").toString()); // 👈 to String!
-            query.bindValue(":text", obj.value("text").toString());
-            query.bindValue(":timestamp", obj.value("send_time").toInt());
+            query.bindValue(":server_id", serverId > 0 ? QVariant(serverId) : QVariant()); // [FIX 1] 0 -> NULL, чтобы не ловить UNIQUE
+            query.bindValue(":chat_id", chat_id);
+            query.bindValue(":sender_id", senderId);
+            query.bindValue(":text", text);
+            query.bindValue(":timestamp", ts);
             query.bindValue(":status", 0);
 
             if (!query.exec()) {
-                qWarning() << "Ошибка вставки сообщения:";
+                qWarning() << "Ошибка вставки сообщения:" << query.lastError().text(); // [FIX 1] теперь видна причина
             }
         }
         db.commit();
@@ -400,10 +435,15 @@ QString SslClient::userId() const {
 }
 
 void SslClient::logout() {
+    QSqlQuery query;
+    query.exec("DELETE FROM chats");
+    query.exec("DELETE FROM message");
+
     settings_.remove("token");
     settings_.remove("user_id");
     settings_.remove("username");
     settings_.sync();
+
     emit userDataChanged();
     emit loggedOut();
 }
@@ -456,5 +496,3 @@ void SslClient::socketError(QAbstractSocket::SocketError){
     m_errorMessage = "Tcp connection failed";
     emit errorMessageChanged();
 }
-
-

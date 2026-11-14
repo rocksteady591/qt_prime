@@ -14,10 +14,19 @@ message SecureEnvelope {
     int32 chat_id = 5;
 }
 
+message SecureImage {
+    bytes nonce = 1;
+    bytes image_data = 2;
+    string sender_id = 3;
+    string recipient_id = 4;
+    int32 chat_id = 5;
+}
+
 message WriteMessage {
     oneof payload {
         KeyExchange key_exchange = 1;
         SecureEnvelope chat_message = 2;
+        SecureImage chat_img_message = 3;
     }
 }
 

@@ -66,7 +66,7 @@ public:
         if (m_chat_id < 0) { return; }
 
         QSqlQuery query;
-        query.prepare("SELECT text, sender_id, timestamp FROM messages WHERE chat_id = :chatId ORDER BY timestamp ASC");
+        query.prepare("SELECT text, sender_id, timestamp FROM messages WHERE chat_id = :chatId ORDER BY timestamp ASC, id ASC"); // [FIX 5] id как второй ключ: стабильный порядок
         query.bindValue(":chatId", m_chat_id);
 
         if(!query.exec()) {
@@ -75,7 +75,6 @@ public:
         }
         setQuery(query);
 
-        // 👇 ДОБАВЬТЕ ЭТОТ ВЫВОД, ЧТОБЫ УВИДЕТЬ РЕЗУЛЬТАТ В КОНСОЛИ
         qDebug() << "MessageModel::refresh() для chatId =" << m_chat_id << "загружено строк:" << rowCount();
     }
 signals:

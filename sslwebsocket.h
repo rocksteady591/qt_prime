@@ -18,10 +18,13 @@ public:
     Q_INVOKABLE void connectWidthToken();
     Q_INVOKABLE void disconnectFromServer();
     Q_INVOKABLE void sendMessage(const QString& message, const QString& recip_id);
+    Q_INVOKABLE void sendImage(const QUrl& image, const QString& recip_id);
+    Q_INVOKABLE void closeSocket();
     QString errorMessage() const { return m_errorMessage; }
     void generateKaypair();
     void handleServerPublickKey(const messenger::KeyExchange& pub_key);
     void handleChatMessage(const messenger::SecureEnvelope& msg);
+    void handleChatImgMessage(const messenger::SecureImage& msg);
     void sendPublicKey();
 private slots:
     void onConnected();

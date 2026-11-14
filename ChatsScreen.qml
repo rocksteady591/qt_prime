@@ -101,8 +101,9 @@ Item {
                             Text {
                                 anchors.centerIn: parent
                                 text: {
-                                    const text = model.recipUsername || ""
-                                    return name.length > 0 ? name[0].toUpperCase() : "?"
+                                    // [FIX 6] было name.length / name[0] - переменной name нет
+                                    const uname = model.recipUsername || ""
+                                    return uname.length > 0 ? uname[0].toUpperCase() : "?"
                                 }
 
                                 color: "white"
@@ -133,7 +134,7 @@ Item {
                         }
 
                         Text {
-                            text: model.model.create_timestamp || ""
+                            text: model.timestamp || "" // [FIX 6] было model.model.create_timestamp
                             color: "#8FA0C0"
                             font.pixelSize: 12
                         }
@@ -142,7 +143,7 @@ Item {
                     MouseArea {
                         anchors.fill: parent
                         onClicked: {
-                            console.log("Кликнули на чат с: " + model.chatName)
+                            console.log("Кликнули на чат с: " + model.recipUsername) // [FIX 6] chatName не существует
                             stackView.push("ChatScreen.qml", {
                                 chatId: model.chatId,
                                 username : model.recipUsername,
@@ -150,7 +151,7 @@ Item {
                                                     ? model.user2Id
                                                     : model.user1Id
                             })
-                            errorText = ""
+                            // [FIX 6] errorText = "" присваивало значение id-объекту (ошибка); текст берётся из SslClient.errorMessage
                         }
                     }
                 }
@@ -216,11 +217,16 @@ Item {
 
                 function onChatsLoaded(chats) {
                     console.log("пришло чатов:", chats.length)
-                    for (let i = 0; i < chats.length; i++) {
-                        console.log("чат:", JSON.stringify(chats[i]))
-                        chatModel.append(chats[i])
-                    }
-                    console.log("в модели теперь:", chatModel.count)
+                    // [FIX 6] у QSqlQueryModel нет append(); чаты уже записаны в БД в getChats(), достаточно перечитать
+                    chatModel.refresh()
+                }
+            }
+
+            // [FIX 6] новое входящее сообщение обновляет последнее сообщение/создаёт чат -> перечитать список
+            Connections {
+                target: WssClient
+                function onMessageSaved(chat_id) {
+                    chatModel.refresh()
                 }
             }
         }

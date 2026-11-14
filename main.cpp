@@ -139,6 +139,18 @@ bool createTables() {
         return false;
     }
 
+    // [FIX 2] Схема messages: server_id должен быть уникальным, иначе
+    // INSERT OR IGNORE не защищает от дублей истории (а в старой БД с UNIQUE
+    // нули от неверного toInt() выбрасывали все сообщения кроме первого).
+    // CREATE TABLE IF NOT EXISTS не меняет существующую таблицу, поэтому делаем индекс.
+    query.exec("UPDATE messages SET server_id = NULL WHERE server_id = 0");
+    query.exec("DELETE FROM messages WHERE server_id IS NOT NULL AND id NOT IN "
+               "(SELECT MIN(id) FROM messages WHERE server_id IS NOT NULL GROUP BY server_id)");
+    if (!query.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_server_id ON messages(server_id)")) {
+        qWarning() << "Ошибка создания индекса server_id:" << query.lastError().text();
+        return false;
+    }
+
     return true;
 }
 
@@ -202,5 +214,5 @@ int main(int argc, char *argv[])
         Qt::QueuedConnection);
     engine.loadFromModule("qt_prime", "Main");
 
-    return QGuiApplication::exec();;
+    return QGuiApplication::exec(); // [FIX 2] убрана лишняя ';'
 }
